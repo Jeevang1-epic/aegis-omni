@@ -1,0 +1,16 @@
+{
+  "name": "aegis-omni",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Autonomous Multi-Modal Living Room, Perimeter & Ambient Memory OS across Fire TV (Vega OS), Alexa+, Ring, and Bee",
+  "license": "Apache-2.0",
+  "workspaces": [
+    "services/alexa-mcp-server",
+    "apps/vega-firetv-client"
+  ],
+  "scripts": {
+    "build": "npm --workspace=services/alexa-mcp-server run build",
+    "test": "npm --workspace=services/alexa-mcp-server run test",
+    "start:mcp": "npm --workspace=services/alexa-mcp-server run start"
+  }
+}
