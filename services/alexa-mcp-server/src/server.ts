@@ -2,6 +2,8 @@ import express, { Request, Response } from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
+import { negotiateRingWhepSession } from "./ringWhepService.js";
+import { correlateBeeAmbientMemory } from "./beeContextService.js";
 
 export const ALLOWED_ORIGINS = new Set([
   "https://" + "alexa.amazon.com",
@@ -12,7 +14,7 @@ export const ALLOWED_ORIGINS = new Set([
 export function createAegisMcpServer(): McpServer {
   const server = new McpServer({
     name: "aegis-omni-alexa-mcp",
-    version: "1.0.0"
+    version: "1.1.0"
   });
 
   server.tool(
@@ -24,6 +26,7 @@ export function createAegisMcpServer(): McpServer {
       contextNote: z.string().describe("Summary correlated from Bee wearable memory and Ring vision")
     },
     async ({ deviceId, actionType, contextNote }) => {
+      const beeContext = await correlateBeeAmbientMemory({ query: contextNote, limit: 3 });
       return {
         content: [
           {
@@ -34,9 +37,10 @@ export function createAegisMcpServer(): McpServer {
               deviceId,
               actionType,
               contextNote,
+              beeMemoryCorrelation: beeContext,
               vegaOverlayCard: {
                 title: "AegisOmni Caretaking Action Executed",
-                subtitle: contextNote,
+                subtitle: beeContext.matchedUtterance,
                 focusTargetId: "pip-primary-ack"
               }
             })
@@ -58,8 +62,31 @@ export function createExpressApp() {
       service: "aegis-omni-alexa-mcp",
       transport: "StreamableHTTP",
       specCompliance: ["2025-11-25", "2026-07-28"],
+      integrations: ["ring-whep", "bee-proxy", "vega-os-focus", "aws-strands"],
       status: "ok"
     });
+  });
+
+  app.post("/api/ring/whep", (req: Request, res: Response) => {
+    try {
+      const result = negotiateRingWhepSession(req.body);
+      res.status(201).json(result);
+    } catch (err) {
+      res.status(400).json({
+        error: err instanceof Error ? err.message : "Invalid Ring WHEP request"
+      });
+    }
+  });
+
+  app.post("/api/bee/correlate", async (req: Request, res: Response) => {
+    try {
+      const context = await correlateBeeAmbientMemory(req.body);
+      res.status(200).json(context);
+    } catch (err) {
+      res.status(400).json({
+        error: err instanceof Error ? err.message : "Invalid Bee query"
+      });
+    }
   });
 
   app.post("/mcp", async (req: Request, res: Response) => {
