@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Autonomous Multi-Modal Living Room, Perimeter & Ambient Memory OS across Fire TV (Vega OS), Alexa+, Ring, and Bee",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "workspaces": [
     "services/alexa-mcp-server",
     "apps/vega-firetv-client"
