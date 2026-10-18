@@ -2,10 +2,17 @@ import { describe, it, expect } from "vitest";
 import request from "supertest";
 import { createExpressApp } from "../src/server.js";
 
-describe("AegisOmni Multi-Device Control Plane (Alexa+ MCP, Ring WHEP, Bee Proxy)", () => {
+describe("AegisOmni Multi-Device Control Plane (Alexa+ MCP, Ring WHEP, Bee Proxy, Vega Simulator)", () => {
   const app = createExpressApp();
   const alexaOrigin = "https://" + "alexa.amazon.com";
   const badOrigin = "https://" + "malicious.example.com";
+
+  it("serves the interactive 10-foot Fire TV Vega OS and Alexa+ simulator UI on GET /", async () => {
+    const res = await request(app).get("/");
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("FIRE TV VEGA OS");
+    expect(res.text).toContain("TVFocusGuideView");
+  });
 
   it("reports healthy Streamable HTTP and multi-device integrations on GET /health", async () => {
     const res = await request(app).get("/health");
