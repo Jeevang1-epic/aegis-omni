@@ -1,140 +1,85 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import express, { Request, Response } from "express";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { z } from "zod";
-import { negotiateRingWhepSession } from "./ringWhepService.js";
-import { correlateBeeAmbientMemory } from "./beeContextService.js";
-
+﻿import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import express, { Request, Response, NextFunction } from 'express';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { z } from 'zod';
+import { negotiateRingWhepSession, SCENARIOS } from './ringWhepService.js';
+import { BeeTodoInputSchema } from './beeContextService.js';
+import { AegisServices, CatchUpSchema } from './workflowService.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-export const ALLOWED_ORIGINS = new Set([
-  "https://" + "alexa.amazon.com",
-  "http://" + "localhost:3000",
-  "http://" + "localhost:8080",
-  "http://" + "127.0.0.1:8080"
-]);
-
-export function createAegisMcpServer(): McpServer {
-  const server = new McpServer({
-    name: "aegis-omni-alexa-mcp",
-    version: "1.2.0"
-  });
-
-  server.tool(
-    "dispatch_perimeter_resolution",
-    "Executes autonomous caretaking or delivery action across Ring WHEP, Bee memory, and Fire TV Vega OS",
-    {
-      deviceId: z.string().describe("Target Ring camera or Fire TV device identifier"),
-      actionType: z.enum(["unlock_drop_box", "announce_voice_directive", "bookmark_tv_timestamp"]),
-      contextNote: z.string().describe("Summary correlated from Bee wearable memory and Ring vision")
-    },
-    async ({ deviceId, actionType, contextNote }) => {
-      const beeContext = await correlateBeeAmbientMemory({ query: contextNote, limit: 3 });
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              status: "executed",
-              protocolRevision: "2025-11-25",
-              deviceId,
-              actionType,
-              contextNote,
-              beeMemoryCorrelation: beeContext,
-              vegaOverlayCard: {
-                title: "AegisOmni Caretaking Action Executed",
-                subtitle: beeContext.matchedUtterance,
-                focusTargetId: "pip-primary-ack"
-              }
-            })
-          }
-        ]
-      };
-    }
-  );
-
+export const ALLOWED_ORIGINS = new Set(['https://alexa.amazon.com', 'http://localhost:3000', 'http://localhost:8080', 'http://127.0.0.1:8080']);
+const RpcSchema = z.object({ jsonrpc: z.literal('2.0'), id: z.union([z.string(), z.number().int().finite()]).optional(), method: z.string().min(1), params: z.record(z.unknown()).optional() }).strict();
+export function createAegisMcpServer(services = new AegisServices()): McpServer {
+  const server = new McpServer({ name: 'aegis-omni-alexa-mcp', version: '2.0.0' });
+  const result = async (name: string, args: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(await services.execute(name, args)) }] });
+  server.tool('query_household_care_status', 'Read simulated camera care events and household notes', {}, args => result('query_household_care_status', args));
+  server.tool('create_caretaking_followup_todo', 'Create a Bee reminder using ISO-8601 alarm_at', BeeTodoInputSchema.shape, args => result('create_caretaking_followup_todo', args));
+  server.tool('generate_live_broadcast_catchup', 'Summarize supplied broadcast annotations within an exact media-time interval', CatchUpSchema.shape, args => result('generate_live_broadcast_catchup', args));
+  server.tool('dispatch_perimeter_resolution', 'Acknowledge a simulated care event; no physical access action', {
+    eventId: z.string().min(1), actionType: z.enum(['acknowledge', 'announce_voice_directive', 'bookmark_tv_timestamp']),
+  }, args => result('dispatch_perimeter_resolution', args));
   return server;
 }
-
-export function createExpressApp() {
+export function createExpressApp(services = new AegisServices()) {
   const app = express();
-  app.use(express.json());
-  app.use(express.static(path.resolve(__dirname, "../public")));
-
-  app.get("/health", (_req: Request, res: Response) => {
-    res.status(200).json({
-      service: "aegis-omni-alexa-mcp",
-      transport: "StreamableHTTP",
-      specCompliance: ["2025-11-25", "2026-07-28"],
-      integrations: ["ring-whep", "bee-proxy", "vega-os-focus", "aws-strands"],
-      status: "ok"
-    });
+  app.disable('x-powered-by');
+  app.use((req, res, next) => {
+    if (req.headers.origin && !ALLOWED_ORIGINS.has(req.headers.origin)) { res.status(403).json({ error: 'Forbidden Origin: DNS rebinding protection active' }); return; }
+    const host = req.hostname;
+    if (!['localhost', '127.0.0.1', '[::1]'].includes(host)) { res.status(403).json({ error: 'Forbidden Host' }); return; }
+    next();
   });
-
-  app.post("/api/ring/whep", (req: Request, res: Response) => {
-    try {
-      const result = negotiateRingWhepSession(req.body);
-      res.status(201).json(result);
-    } catch (err) {
-      res.status(400).json({
-        error: err instanceof Error ? err.message : "Invalid Ring WHEP request"
-      });
-    }
+  app.use(express.json({ limit: '256kb' }));
+  app.use(express.static(path.resolve(__dirname, '../public')));
+  app.get('/health', (_req, res) => res.json({ service: 'aegis-omni-alexa-mcp', transport: 'StreamableHTTP', protocolVersions: ['2025-11-25'], integrations: ['ring-whep', 'bee-proxy', 'vega-os-focus', 'aws-strands'], mode: 'simulator', status: 'ok' }));
+  const route = (handler: (req: Request, res: Response) => Promise<unknown> | unknown) => (req: Request, res: Response, next: NextFunction) => { Promise.resolve().then(() => handler(req, res)).catch(next); };
+  app.post('/api/ring/whep', route((req, res) => res.status(201).json(negotiateRingWhepSession(req.body))));
+  app.post('/api/bee/correlate', route(async (req, res) => res.json(await services.bee.correlate(req.body))));
+  app.get(['/api/bee/facts', '/v1/facts'], route(async (_req, res) => res.json({ facts: await services.bee.facts(), source: services.bee.source })));
+  app.get(['/api/bee/todos', '/v1/todos'], (_req, res) => res.json({ todos: services.bee.listTodos(), source: services.bee.source }));
+  app.post(['/api/bee/todos', '/v1/todos'], route(async (req, res) => res.status(201).json(await services.bee.createTodo(req.body))));
+  app.get(['/api/bee/stream', '/v1/stream'], (req, res) => {
+    const types = typeof req.query.types === 'string' ? req.query.types.split(',') : [];
+    res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Aegis-Source': 'simulator' });
+    for (const event of services.bee.streamEvents()) if (!types.length || types.includes(event.type)) res.write(`event: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`);
+    res.end(); // Finite snapshot stream: clients explicitly refresh; never claim live wearable connectivity.
   });
-
-  app.post("/api/bee/correlate", async (req: Request, res: Response) => {
-    try {
-      const context = await correlateBeeAmbientMemory(req.body);
-      res.status(200).json(context);
-    } catch (err) {
-      res.status(400).json({
-        error: err instanceof Error ? err.message : "Invalid Bee query"
-      });
+  app.get('/api/scenarios', (_req, res) => res.json({ scenarios: SCENARIOS, source: 'simulator' }));
+  app.post('/api/scenarios/trigger', route(async (req, res) => {
+    const triggered = services.care.trigger(req.body);
+    res.status(201).json({ ...triggered, bee: await services.bee.correlate({ query: triggered.scenario.query }) });
+  }));
+  app.post('/api/mcp/execute-action', route(async (req, res) => {
+    const input = z.object({ name: z.string().min(1), arguments: z.record(z.unknown()).default({}) }).parse(req.body);
+    res.json({ result: await services.execute(input.name, input.arguments) });
+  }));
+  app.post('/mcp', route(async (req, res) => {
+    const accepted = (req.headers.accept ?? '').toLowerCase().split(',').filter(part => {
+      const quality = part.match(/;\s*q=([^;]+)/); return !quality || (Number(quality[1]) > 0 && Number(quality[1]) <= 1);
+    }).map(part => part.split(';')[0].trim());
+    if (!accepted.includes('application/json') || !accepted.includes('text/event-stream')) { res.status(406).json({ error: 'Streamable HTTP requires Accept: application/json, text/event-stream' }); return; }
+    const parsed = RpcSchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid JSON-RPC request' } }); return; }
+    if (req.headers['mcp-protocol-version'] && req.headers['mcp-protocol-version'] !== '2025-11-25') { res.status(400).json({ error: 'This SDK endpoint supports 2025-11-25; modern envelopes are available in the companion bridge' }); return; }
+    if (parsed.data.id === undefined) {
+      if (!parsed.data.method.startsWith('notifications/')) { res.status(400).json({ error: 'Expected notification method' }); return; }
+      res.status(202).end(); return;
     }
+    const server = createAegisMcpServer(services);
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    res.on('close', () => { void server.close().catch(() => undefined); });
+    await server.connect(transport);
+    await transport.handleRequest(req, res, parsed.data);
+  }));
+  app.all('/mcp', (_req, res) => res.set('Allow', 'POST').status(405).end());
+  app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    if (res.headersSent) { res.end(); return; }
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid request' });
   });
-
-  app.post("/mcp", async (req: Request, res: Response) => {
-    const origin = req.headers.origin;
-    if (origin && !ALLOWED_ORIGINS.has(origin)) {
-      res.status(403).json({
-        jsonrpc: "2.0",
-        error: { code: -32600, message: "Forbidden Origin: DNS rebinding protection active" }
-      });
-      return;
-    }
-
-    const accept = req.headers.accept || "";
-    if (!accept.includes("application/json") || !accept.includes("text/event-stream")) {
-      res.status(406).json({
-        jsonrpc: "2.0",
-        error: { code: -32600, message: "Streamable HTTP requires Accept: application/json, text/event-stream" }
-      });
-      return;
-    }
-
-    if (req.body && req.body.method && req.body.id === undefined) {
-      res.status(202).end();
-      return;
-    }
-
-    const mcpServer = createAegisMcpServer();
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined
-    });
-
-    await mcpServer.connect(transport);
-    await transport.handleRequest(req, res, req.body);
-  });
-
   return app;
 }
-
-if (process.env.NODE_ENV !== "test") {
-  const port = Number(process.env.PORT || 8080);
-  const app = createExpressApp();
-  app.listen(port, () => {
-    console.log(`AegisOmni 10-Foot Simulator & Alexa+ MCP Server running at http://localhost:${port}`);
-  });
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const port = Number(process.env.PORT ?? 8080);
+  createExpressApp().listen(port, '127.0.0.1', () => console.log(`AegisOmni simulator: http://localhost:${port}`));
 }
