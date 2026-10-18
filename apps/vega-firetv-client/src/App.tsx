@@ -56,7 +56,13 @@ export class VegaAppController {
     Object.assign(this.state, { pipOverlayActive: true, pipPhase: 'gathering', ringWhepEndpoint: endpoint,
       beeMemoryNote: note, focusedElementId: 'pip-resolve', aiCatchUpSummary: null, error: null });
     this.focus.trap(true); this.focus.focus('pip-resolve'); this.publish();
-    try { await negotiate(); if (generation === this.generation) this.state.pipPhase = 'visible'; }
+    try {
+      await negotiate();
+      if (generation === this.generation) {
+        if (this.state.pipPhase !== 'connecting') throw new Error('ICE completion must precede negotiation');
+        this.state.pipPhase = 'visible';
+      }
+    }
     catch (error) { if (generation === this.generation) { this.state.pipPhase = 'error'; this.state.error = String(error); } }
     this.publish();
   }

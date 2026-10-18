@@ -19,8 +19,8 @@ export class BeeContextService {
   }
   async createTodo(input: unknown) {
     const parsed = BeeTodoInputSchema.parse(input);
-    const todo = this.options.mode === 'proxy' ? TodoSchema.parse(await this.proxy('/v1/todos', parsed)) : TodoSchema.parse({ id: `todo-${this.todos.length + 1}`, text: parsed.text, alarm_at: parsed.alarm_at === null ? null : Date.parse(parsed.alarm_at) });
     if (this.todos.length >= 1000) throw new Error('Todo capacity reached');
+    const todo = this.options.mode === 'proxy' ? TodoSchema.parse(await this.proxy('/v1/todos', parsed)) : TodoSchema.parse({ id: `todo-${this.todos.length + 1}`, text: parsed.text, alarm_at: parsed.alarm_at === null ? null : Date.parse(parsed.alarm_at) });
     this.todos.push(todo);
     return { ...todo, alarmAtIso: todo.alarm_at === null ? null : new Date(todo.alarm_at).toISOString(), source: this.source };
   }
