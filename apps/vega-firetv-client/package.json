@@ -1,0 +1,10 @@
+{
+  "name": "@aegis-omni/vega-firetv-client",
+  "version": "1.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "10-Foot Vega OS and Fire TV client with TVFocusGuideView, Shaka MSE/EME player, and Ring WHEP PiP overlay",
+  "dependencies": {
+    "react-native-vega-mcp-bridge": "^0.1.0"
+  }
+}
