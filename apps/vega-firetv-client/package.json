@@ -3,5 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "license": "Apache-2.0",
-  "description": "10-Foot Vega OS and Fire TV client with TVFocusGuideView, Shaka MSE/EME player, and Ring WHEP PiP overlay"
+  "description": "10-Foot Vega OS and Fire TV client with TVFocusGuideView, Shaka MSE/EME player, and Ring WHEP PiP overlay",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "main": "dist/App.js",
+  "types": "dist/App.d.ts"
 }

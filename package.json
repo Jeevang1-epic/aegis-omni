@@ -9,7 +9,7 @@
     "apps/vega-firetv-client"
   ],
   "scripts": {
-    "build": "npm --workspace=services/alexa-mcp-server run build",
+    "build": "npm run build --workspaces --if-present",
     "test": "npm --workspace=services/alexa-mcp-server run test",
     "start:mcp": "npm --workspace=services/alexa-mcp-server run start"
   },

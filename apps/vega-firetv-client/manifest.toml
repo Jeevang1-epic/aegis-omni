@@ -1,4 +1,5 @@
 schema-version = 1
+# Targets the requested Vega 2.x loader; Vega 4.x packaging needs its newer runtime.
 
 [package]
 title = "AegisOmni Caretaking & Co-Viewing OS"
