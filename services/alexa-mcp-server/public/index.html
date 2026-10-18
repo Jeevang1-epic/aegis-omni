@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AegisOmni — Fire TV (Vega OS), Alexa+, Ring WHEP & Bee Simulator</title>
+  <style>
+    :root {
+      --bg: #080b12;
+      --panel: #111827;
+      --border: #1f2937;
+      --accent: #FF9900;
+      --cyan: #00d4ff;
+      --green: #10b981;
+      --text: #f9fafb;
+      --muted: #9ca3af;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 20px; min-height: 100vh; display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+    .tv-bezel {
+      background: linear-gradient(145deg, #0d1322, #060911);
+      border: 3px solid #263248;
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+      min-height: 540px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 28px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+    }
+    .badge-bar { display: flex; justify-content: space-between; align-items: center; }
+    .badge { background: rgba(255,153,0,0.15); border: 1px solid var(--accent); color: var(--accent); padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+    .focus-pill { background: rgba(0,212,255,0.12); border: 1px solid var(--cyan); color: var(--cyan); padding: 6px 12px; border-radius: 8px; font-size: 13px; }
+    .broadcast-stage { my: auto; padding: 30px 0; }
+    .broadcast-title { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 8px; }
+    .broadcast-sub { color: var(--muted); font-size: 15px; }
+    .catchup-banner {
+      margin-top: 18px;
+      background: rgba(16,185,129,0.14);
+      border-left: 4px solid var(--green);
+      padding: 14px 18px;
+      border-radius: 8px;
+      display: none;
+    }
+    .pip-card {
+      position: absolute;
+      top: 76px;
+      right: 28px;
+      width: 390px;
+      background: rgba(17, 24, 39, 0.96);
+      border: 2px solid var(--cyan);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.9);
+      display: none;
+    }
+    .pip-header { display: flex; justify-content: space-between; font-size: 12px; color: var(--cyan); font-weight: 700; text-transform: uppercase; margin-bottom: 8px; }
+    .pip-video-box {
+      background: #05080f;
+      border: 1px solid #374151;
+      border-radius: 8px;
+      height: 120px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 10px;
+      color: #6ee7b7;
+      font-size: 13px;
+      text-align: center;
+      padding: 10px;
+    }
+    .bee-box { background: rgba(255,153,0,0.1); border-left: 3px solid var(--accent); padding: 8px 10px; font-size: 12px; margin-bottom: 12px; border-radius: 4px; }
+    .dpad-actions { display: flex; flex-direction: column; gap: 8px; }
+    .tv-btn {
+      background: #1f2937;
+      color: var(--text);
+      border: 2px solid transparent;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+    }
+    .tv-btn.focused {
+      border-color: var(--accent);
+      background: rgba(255,153,0,0.22);
+      box-shadow: 0 0 12px rgba(255,153,0,0.5);
+    }
+    .controls-footer { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 16px; }
+    .side-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+    .log-box { background: #05070c; border: 1px solid #1f2937; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 12px; color: #a7f3d0; height: 390px; overflow-y: auto; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <div class="tv-bezel">
+    <div class="badge-bar">
+      <span class="badge">FIRE TV VEGA OS • W3C MSE/EME SHAKA PLAYER</span>
+      <span class="focus-pill" id="focusIndicator">TVFocusGuideView Focus: shaka-player-controls</span>
+    </div>
+
+    <div class="broadcast-stage">
+      <div class="broadcast-title">NBA LIVE 4K: Celtics vs. Lakers (Q4 • 02:14)</div>
+      <div class="broadcast-sub">Multi-Modal Living Room Stream • Adaptive HLS/DASH • 60 FPS Lock (Zero LMK Drops)</div>
+      <div class="catchup-banner" id="catchupBanner">
+        <strong>⚡ AI Co-Viewing Instant Catch-Up (45s Missed While Handling Door):</strong>
+        <div id="catchupText" style="margin-top:4px;font-size:14px;color:#d1fae5;"></div>
+      </div>
+    </div>
+
+    <div class="pip-card" id="pipOverlay">
+      <div class="pip-header">
+        <span>🔴 RING AMAZON VISION WHEP</span>
+        <span>RECVONLY H.264</span>
+      </div>
+      <div class="pip-video-box" id="whepStatusBox">
+        Initializing Ring WHEP SDP Handshake...
+      </div>
+      <div class="bee-box" id="beeMemoryBox">
+        Correlating Bee Wearable Neural Memory...
+      </div>
+      <div class="dpad-actions">
+        <button class="tv-btn focused" id="btnAct0" onclick="executeMcpAction('unlock_drop_box')">
+          [D-Pad Enter] Unlock Cold-Chain Drop-Box & Log to Bee Todos
+        </button>
+        <button class="tv-btn" id="btnAct1" onclick="executeMcpAction('bookmark_tv_timestamp')">
+          [D-Pad Down] Dismiss & Generate AI Sports Replay Catch-Up
+        </button>
+      </div>
+    </div>
+
+    <div class="controls-footer">
+      <button class="tv-btn focused" onclick="triggerPerimeterEvent()">
+        1. Simulate Ring Doorbell Arrival + Bee Memory Correlation
+      </button>
+      <button class="tv-btn" onclick="cycleFocus()">
+        2. D-Pad Focus Next (TVFocusGuideView)
+      </button>
+      <button class="tv-btn" onclick="executeFocused()">
+        3. D-Pad Select (Invoke Alexa+ Streamable HTTP /mcp)
+      </button>
+    </div>
+  </div>
+
+  <div class="side-panel">
+    <h3 style="font-size:16px;">Alexa+ MCP & AWS Strands Telemetry</h3>
+    <p style="font-size:12px;color:var(--muted);">Live protocol trace across Ring WHEP, Bee Proxy, and Streamable HTTP /mcp (2025-11-25 / 2026-07-28)</p>
+    <div class="log-box" id="telemetryLog">Ready. Press Button 1 or use Arrow keys + Enter to test multi-device convergence.</div>
+  </div>
+
+  <script>
+    let focusedIdx = 0;
+    let overlayOpen = false;
+
+    function logEvent(title, payload) {
+      const box = document.getElementById("telemetryLog");
+      const ts = new Date().toISOString().split("T")[1].slice(0, 8);
+      box.textContent = `[${ts}] ${title}\n${JSON.stringify(payload, null, 2)}\n\n` + box.textContent;
+    }
+
+    async function triggerPerimeterEvent() {
+      document.getElementById("pipOverlay").style.display = "block";
+      overlayOpen = true;
+      focusedIdx = 0;
+      updateFocusUI();
+
+      const whepRes = await fetch("/api/ring/whep", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deviceId: "ring-front-door-01",
+          sdpOffer: "v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=recvonly\r\n",
+          caretakingMode: "cold_chain_delivery"
+        })
+      }).then(r => r.json());
+
+      document.getElementById("whepStatusBox").textContent =
+        "LIVE WHEP STREAM ACTIVE\nEndpoint: " + whepRes.whepEndpoint + "\nSDP Verified: video-only recvonly (201 Created)";
+      logEvent("RING WHEP 201 SDP ANSWER", whepRes);
+
+      const beeRes = await fetch("/api/bee/correlate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "Grandma insulin delivery", limit: 3 })
+      }).then(r => r.json());
+
+      document.getElementById("beeMemoryBox").textContent =
+        "🐝 Bee Context: " + beeRes.matchedUtterance + " (Todo Alarm ISO: " + beeRes.todoItem.alarmAtIso + ")";
+      logEvent("BEE WEARABLE NEURAL CORRELATION", beeRes);
+    }
+
+    function updateFocusUI() {
+      const b0 = document.getElementById("btnAct0");
+      const b1 = document.getElementById("btnAct1");
+      b0.classList.toggle("focused", focusedIdx === 0);
+      b1.classList.toggle("focused", focusedIdx === 1);
+      document.getElementById("focusIndicator").textContent =
+        overlayOpen
+          ? `TVFocusGuideView Locked: ${focusedIdx === 0 ? "pip-action-unlock" : "pip-action-catchup"}`
+          : "TVFocusGuideView Focus: shaka-player-controls";
+    }
+
+    function cycleFocus() {
+      if (!overlayOpen) return;
+      focusedIdx = (focusedIdx + 1) % 2;
+      updateFocusUI();
+    }
+
+    function executeFocused() {
+      if (!overlayOpen) {
+        triggerPerimeterEvent();
+        return;
+      }
+      executeMcpAction(focusedIdx === 0 ? "unlock_drop_box" : "bookmark_tv_timestamp");
+    }
+
+    async function executeMcpAction(actionType) {
+      const notifyRes = await fetch("/mcp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json, text/event-stream"
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "notifications/initialized"
+        })
+      });
+
+      logEvent(`ALEXA+ STREAMABLE HTTP /mcp (${notifyRes.status} Accepted)`, {
+        dispatchedAction: actionType,
+        deviceId: "ring-front-door-01",
+        vegaFocusRestoredTo: "shaka-player-controls"
+      });
+
+      document.getElementById("pipOverlay").style.display = "none";
+      overlayOpen = false;
+      updateFocusUI();
+
+      const banner = document.getElementById("catchupBanner");
+      banner.style.display = "block";
+      document.getElementById("catchupText").textContent =
+        `Action '${actionType}' completed via Alexa+ MCP & AWS Strands. While you handled the front door (45s), Tatum hit a 3-pointer at 01:48; game paused at timeout.`;
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") cycleFocus();
+      if (e.key === "Enter") executeFocused();
+    });
+  </script>
+</body>
+</html>

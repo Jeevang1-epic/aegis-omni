@@ -1,3 +1,5 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express, { Request, Response } from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -5,16 +7,19 @@ import { z } from "zod";
 import { negotiateRingWhepSession } from "./ringWhepService.js";
 import { correlateBeeAmbientMemory } from "./beeContextService.js";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 export const ALLOWED_ORIGINS = new Set([
   "https://" + "alexa.amazon.com",
   "http://" + "localhost:3000",
+  "http://" + "localhost:8080",
   "http://" + "127.0.0.1:8080"
 ]);
 
 export function createAegisMcpServer(): McpServer {
   const server = new McpServer({
     name: "aegis-omni-alexa-mcp",
-    version: "1.1.0"
+    version: "1.2.0"
   });
 
   server.tool(
@@ -56,6 +61,7 @@ export function createAegisMcpServer(): McpServer {
 export function createExpressApp() {
   const app = express();
   app.use(express.json());
+  app.use(express.static(path.resolve(__dirname, "../public")));
 
   app.get("/health", (_req: Request, res: Response) => {
     res.status(200).json({
@@ -129,6 +135,6 @@ if (process.env.NODE_ENV !== "test") {
   const port = Number(process.env.PORT || 8080);
   const app = createExpressApp();
   app.listen(port, () => {
-    console.log(`AegisOmni Alexa+ Streamable HTTP MCP Server listening on port ${port}`);
+    console.log(`AegisOmni 10-Foot Simulator & Alexa+ MCP Server running at http://localhost:${port}`);
   });
 }
