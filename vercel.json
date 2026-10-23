@@ -1,15 +1,9 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": null,
   "buildCommand": "npm run build",
-  "outputDirectory": "services/alexa-mcp-server/public",
-  "functions": {
-    "api/index.js": {
-      "includeFiles": "services/alexa-mcp-server/{dist,public}/**",
-      "maxDuration": 60
-    }
-  },
+  "outputDirectory": "public",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index" }
+    { "source": "/mcp", "destination": "/api" },
+    { "source": "/health", "destination": "/api" },
+    { "source": "/api/(.*)", "destination": "/api" }
   ]
 }
