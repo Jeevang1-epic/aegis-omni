@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 const $ = id => document.getElementById(id);
 let rpcId = 1, scenarios = [], active = null, busy = false, start = 0, playing = true, mode = 'sports';
 let mediaTime = 0, lastFrame = performance.now(), frames = 0, fpsStart = lastFrame, previousFocus = null, remoteTarget = null;
@@ -115,17 +115,38 @@ function render(now) {
   const seconds = Math.floor(mediaTime); $('timecode').textContent = `${String(Math.floor(seconds / 3600)).padStart(2,'0')}:${String(Math.floor(seconds / 60) % 60).padStart(2,'0')}:${String(seconds % 60).padStart(2,'0')}`;
   $('progress-fill').style.width = `${(mediaTime % 300) / 3}%`; $('clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const w = 1600, h = 900;
-  const gradient = ctx.createLinearGradient(0,0,0,h); gradient.addColorStop(0,'#10293f'); gradient.addColorStop(1,'#07111e'); ctx.fillStyle = gradient; ctx.fillRect(0,0,w,h);
-  for (let i=0;i<80;i++) { ctx.fillStyle = i%3 ? '#314a5b' : '#789285'; ctx.fillRect(i*23,130+(i%4)*12,6,5); }
+  const gradient = ctx.createLinearGradient(0,0,0,h); gradient.addColorStop(0,'#ded2be'); gradient.addColorStop(1,'#625447'); ctx.fillStyle = gradient; ctx.fillRect(0,0,w,h);
+  for (let i=0;i<80;i++) { ctx.fillStyle = i%3 ? '#a39480' : '#eee3d1'; ctx.fillRect(i*23,130+(i%4)*12,6,5); }
   ctx.save(); ctx.translate(800,450); ctx.scale(1,.65); ctx.rotate(-.11);
-  ctx.fillStyle = mode === 'sports' ? '#a17e50' : '#485e63'; ctx.fillRect(-690,-340,1380,680);
+  ctx.fillStyle = mode === 'sports' ? '#cba776' : '#e9e1d2'; ctx.fillRect(-690,-340,1380,680);
   for (let i=0;i<20;i++) { ctx.fillStyle = i%2 ? '#c2a27411' : '#1f170a11'; ctx.fillRect(-690+i*69,-340,69,680); }
-  ctx.strokeStyle = '#e8d3a5'; ctx.lineWidth=4; ctx.strokeRect(-660,-310,1320,620); ctx.beginPath();ctx.moveTo(0,-310);ctx.lineTo(0,310);ctx.stroke();ctx.beginPath();ctx.arc(0,0,100,0,Math.PI*2);ctx.stroke();
+  if (mode === 'sports') { ctx.strokeStyle = '#f9edd7'; ctx.lineWidth=4; ctx.strokeRect(-660,-310,1320,620); ctx.beginPath();ctx.moveTo(0,-310);ctx.lineTo(0,310);ctx.stroke();ctx.beginPath();ctx.arc(0,0,100,0,Math.PI*2);ctx.stroke();
   for (const side of [-1,1]) { ctx.strokeRect(side<0?-660:450,-130,210,260); ctx.beginPath();ctx.arc(side*600,0,270,side<0?-Math.PI/2:Math.PI/2,side<0?Math.PI/2:Math.PI*1.5);ctx.stroke();ctx.fillStyle='#dbdfd5';ctx.fillRect(side*620,-45,8,90); }
-  ctx.fillStyle='#173d39';ctx.font='bold 35px Segoe UI';ctx.textAlign='center';ctx.fillText(mode==='sports'?'AEGIS ARENA':'MOVEMENT STUDIO',0,15);
-  for (let i=0;i<(mode==='sports'?10:5);i++) { const x=Math.sin(mediaTime*.35+i*1.7)*440,y=Math.cos(mediaTime*.25+i*2.1)*230;ctx.fillStyle='#0005';ctx.beginPath();ctx.ellipse(x+6,y+15,24,12,0,0,Math.PI*2);ctx.fill();ctx.fillStyle=i<5?'#caeadd':'#e58551';ctx.beginPath();ctx.arc(x,y,15,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 13px Segoe UI';ctx.fillText(String(i+1),x,y+5); }
+  } else { for (let mat=0;mat<5;mat++) { ctx.fillStyle=mat%2?'#a9b5a0':'#baa88e'; ctx.fillRect(-550+mat*235,-130,150,310); } }
+  ctx.fillStyle='#65503b';ctx.font='bold 35px Segoe UI';ctx.textAlign='center';ctx.fillText(mode==='sports'?'AEGIS ARENA':'MOVEMENT STUDIO',0,15);
+  for (let i=0;i<(mode==='sports'?10:5);i++) { const x=Math.sin(mediaTime*.35+i*1.7)*440,y=Math.cos(mediaTime*.25+i*2.1)*230;ctx.fillStyle='#0005';ctx.beginPath();ctx.ellipse(x+6,y+15,24,12,0,0,Math.PI*2);ctx.fill();ctx.fillStyle=i<5?'#305e4b':'#a75038';ctx.beginPath();ctx.arc(x,y,15,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 13px Segoe UI';ctx.fillText(String(i+1),x,y+5); }
   ctx.restore();
-  cam.fillStyle='#273c42';cam.fillRect(0,0,640,360);cam.fillStyle='#334c4b';cam.fillRect(0,0,260,360);cam.fillStyle='#1a282b';cam.fillRect(340,30,220,330);cam.fillStyle='#607f72';cam.fillRect(360,45,180,315);cam.fillStyle='#d2ba7d';cam.fillRect(505,200,8,8);cam.fillStyle='#9e8060';cam.fillRect(220,230,140,100);cam.strokeStyle='#a8f0ca';cam.lineWidth=3;cam.strokeRect(205,205,170,135);cam.fillStyle='#a8f0ca';cam.font='16px Consolas';cam.fillText(active?.scenario.id==='elder_care'?'CHECK-IN REGION':'OBJECT REGION',205,195);cam.font='13px Consolas';cam.fillText('ILLUSTRATIVE CV · NO INFERENCE',20,30);
+  // Architectural camera vignettes, explicitly illustrative rather than inferred video.
+  const garden = active?.scenario.id === 'elder_care';
+  const sideDoor = active?.scenario.id === 'accessibility_relay';
+  cam.fillStyle='#ece4d7';cam.fillRect(0,0,640,360);
+  cam.fillStyle='#d3c5ae';cam.fillRect(0,270,640,90);
+  for(let slat=0;slat<13;slat++){cam.fillStyle=slat%2?'#e1d6c4':'#e8dece';cam.fillRect(slat*50,0,48,270);}
+  if(garden){
+    cam.fillStyle='#a9b49a';cam.fillRect(0,130,640,140);
+    cam.fillStyle='#e7ddc9';cam.beginPath();cam.moveTo(260,150);cam.lineTo(350,150);cam.lineTo(480,360);cam.lineTo(140,360);cam.fill();
+    for(const x of [65,535]){cam.fillStyle='#7c6953';cam.fillRect(x,90,12,160);cam.fillStyle='#647b58';cam.beginPath();cam.ellipse(x+5,95,60,70,0,0,Math.PI*2);cam.fill();}
+    cam.fillStyle='#6a7264';cam.beginPath();cam.arc(305,170,13,0,Math.PI*2);cam.fill();cam.fillRect(292,185,26,48);
+  }else{
+    cam.fillStyle='#b6a18a';cam.fillRect(330,35,220,300);cam.fillStyle=sideDoor?'#697466':'#71513c';cam.fillRect(345,45,190,290);
+    for(let seam=0;seam<6;seam++){cam.fillStyle='#ffffff12';cam.fillRect(350+seam*31,45,2,290);}
+    cam.fillStyle='#c8a97e';cam.fillRect(502,175,6,40);cam.fillStyle='#41382e';cam.fillRect(568,135,18,30);
+    cam.fillStyle='#a98457';cam.fillRect(225,245,100,70);cam.fillStyle='#d6bd92';cam.fillRect(265,245,16,70);
+    cam.fillStyle='#7f8d6b';cam.beginPath();cam.ellipse(90,190,37,58,0,0,Math.PI*2);cam.fill();cam.fillStyle='#b58268';cam.fillRect(65,235,50,65);
+  }
+  cam.strokeStyle='#2d6a4f';cam.lineWidth=3;cam.strokeRect(205,145,170,185);
+  cam.fillStyle='#fffcf7';cam.fillRect(205,123,190,23);cam.fillStyle='#234e3b';cam.font='14px Consolas';cam.fillText(garden?'CHECK-IN REGION':'OBJECT REGION',211,140);
+  cam.fillStyle='#fffcf7';cam.fillRect(12,10,305,24);cam.fillStyle='#4a433b';cam.font='13px Consolas';cam.fillText('ILLUSTRATIVE CV ? NO INFERENCE',20,27);
   requestAnimationFrame(render);
 }
 requestAnimationFrame(render);
