@@ -10,6 +10,18 @@ import { AegisServices, CatchUpSchema } from './workflowService.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const ALLOWED_ORIGINS = new Set(['https://alexa.amazon.com', 'http://localhost:3000', 'http://localhost:8080', 'http://127.0.0.1:8080']);
 const RpcSchema = z.object({ jsonrpc: z.literal('2.0'), id: z.union([z.string(), z.number().int().finite()]).optional(), method: z.string().min(1), params: z.record(z.unknown()).optional() }).strict();
+function authority(value: string | undefined): string | null {
+  if (!value || /[\s,/@?#\\]/.test(value)) return null;
+  try { const url = new URL(`https://${value}`); return url.host.toLowerCase(); } catch { return null; }
+}
+export function isAllowedOrigin(origin: string, hosts: readonly string[]): boolean {
+  if (ALLOWED_ORIGINS.has(origin)) return true;
+  try {
+    const url = new URL(origin);
+    if (url.origin !== origin || url.username || url.password || !['http:', 'https:'].includes(url.protocol)) return false;
+    return hosts.includes(url.host.toLowerCase()) || (url.protocol === 'https:' && url.hostname.endsWith('.vercel.app'));
+  } catch { return false; }
+}
 export function createAegisMcpServer(services = new AegisServices()): McpServer {
   const server = new McpServer({ name: 'aegis-omni-alexa-mcp', version: '2.0.0' });
   const result = async (name: string, args: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(await services.execute(name, args)) }] });
@@ -25,9 +37,13 @@ export function createExpressApp(services = new AegisServices()) {
   const app = express();
   app.disable('x-powered-by');
   app.use((req, res, next) => {
-    if (req.headers.origin && !ALLOWED_ORIGINS.has(req.headers.origin)) { res.status(403).json({ error: 'Forbidden Origin: DNS rebinding protection active' }); return; }
-    const host = req.hostname;
-    if (!['localhost', '127.0.0.1', '[::1]'].includes(host)) { res.status(403).json({ error: 'Forbidden Host' }); return; }
+    const host = authority(req.headers.host);
+    // Trust proxy authority only inside the Vercel runtime, never on the local listener.
+    const forwarded = process.env.VERCEL === '1' && typeof req.headers['x-forwarded-host'] === 'string'
+      ? authority(req.headers['x-forwarded-host']) : null;
+    const hosts = [host, forwarded].filter((value): value is string => value !== null);
+    if (req.headers.origin && !isAllowedOrigin(req.headers.origin, hosts)) { res.status(403).json({ error: 'Forbidden Origin: DNS rebinding protection active' }); return; }
+    if (!host || (process.env.VERCEL !== '1' && !['localhost', '127.0.0.1', '[::1]'].includes(req.hostname) && !new URL(`https://${host}`).hostname.endsWith('.vercel.app'))) { res.status(403).json({ error: 'Forbidden Host' }); return; }
     next();
   });
   app.use(express.json({ limit: '256kb' }));

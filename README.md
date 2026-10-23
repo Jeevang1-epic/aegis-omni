@@ -173,3 +173,13 @@ See [friction logs and product feedback](docs/friction-logs/FRICTION_LOG_AND_FEE
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE). `.nvmrc` retains Node 24.
+
+## Vercel deployment
+
+Import this repository with the repository root as **Root Directory**, framework preset **Other**, and Node 24. The checked-in `vercel.json` runs `npm run build`, publishes the simulator assets, and rewrites application routes to `api/index.js`. That entrypoint exports the compiled Express application without opening a port. Function bundling explicitly includes compiled backend files and public assets, so Express can also serve `/`, `/styles.css`, and `/simulator.js`. `/mcp`, `/health`, `/api/*`, and `/v1/*` use the same function.
+
+Origins are parsed as URLs: the existing explicit allowlist, same-host origins, and HTTPS subdomains of `.vercel.app` are accepted. Forwarded host matching is enabled only when Vercel sets `VERCEL=1`. Malformed origins and suffix lookalikes are rejected. Allowing all Vercel tenant origins is intentional per this demo policy; it is not authentication. Restrict that policy and add authentication before connecting private household data.
+
+**State limitation:** care events and reminders remain in-memory demo data. Warm function invocations may reuse them, but cold starts and parallel instances do not share them. A trigger followed by a resolution on another instance can report an unknown event. Use a shared durable store before relying on multi-request workflow continuity in production. This configuration makes the UI and endpoints deployable; it does not make the demo state durable or deploy the separate Python AgentCore runtime.
+
+After deployment, check `/`, `/styles.css`, `/simulator.js`, `/health`, `/api/scenarios`, and an MCP initialize/tools/list exchange. Hosted deployment and cross-instance persistence are separate from the local verification suite. Configuration follows [Vercel function and rewrite settings](https://vercel.com/docs/project-configuration/vercel-json).

@@ -216,3 +216,28 @@ describe('Multi-device workflows', () => {
     expect((await request(app).get('/styles.css')).text).toContain(':focus-visible');
   });
 });
+
+ describe('Vercel origin routing', () => {
+  it('serves UI, assets and APIs on a Vercel hostname', async () => {
+    const app = createExpressApp();
+    for (const path of ['/', '/styles.css', '/simulator.js', '/health', '/api/scenarios', '/v1/facts']) {
+      expect((await request(app).get(path).set('Host', 'aegis-demo.vercel.app').set('Origin', 'https://aegis-demo.vercel.app')).status).toBe(200);
+    }
+  });
+  it('accepts another Vercel preview but rejects suffix lookalikes and hostile origins', async () => {
+    const app = createExpressApp();
+    expect((await request(app).get('/health').set('Host', 'aegis.vercel.app').set('Origin', 'https://preview.vercel.app')).status).toBe(200);
+    for (const origin of ['https://malicious.example.com', 'https://aegis.vercel.app.evil.test', 'https://vercel.app@evil.test', 'null']) {
+      expect((await request(app).get('/health').set('Host', 'aegis.vercel.app').set('Origin', origin)).status).toBe(403);
+    }
+  });
+  it('matches forwarded custom-domain origins only in the Vercel runtime', async () => {
+    const previous = process.env.VERCEL;
+    try {
+      process.env.VERCEL = '1';
+      expect((await request(createExpressApp()).get('/health').set('Host', 'internal.vercel.app').set('X-Forwarded-Host', 'home.example.org').set('Origin', 'https://home.example.org')).status).toBe(200);
+      delete process.env.VERCEL;
+      expect((await request(createExpressApp()).get('/health').set('X-Forwarded-Host', 'evil.test').set('Origin', 'https://evil.test')).status).toBe(403);
+    } finally { if (previous === undefined) delete process.env.VERCEL; else process.env.VERCEL = previous; }
+  });
+});
