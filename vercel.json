@@ -1,9 +1,13 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "public",
-  "rewrites": [
-    { "source": "/mcp", "destination": "/api" },
-    { "source": "/health", "destination": "/api" },
-    { "source": "/api/(.*)", "destination": "/api" }
+  "version": 2,
+  "builds": [
+    { "src": "api/index.js", "use": "@vercel/node" },
+    { "src": "services/alexa-mcp-server/public/**", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/mcp", "dest": "/api/index.js" },
+    { "src": "/health", "dest": "/api/index.js" },
+    { "src": "/api/(.*)", "dest": "/api/index.js" },
+    { "src": "/(.*)", "dest": "/services/alexa-mcp-server/public/$1" }
   ]
 }
